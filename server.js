@@ -11,11 +11,16 @@ const PORT = process.env.PORT || 5000;
 
 // ✅ Allow only your Netlify frontend
 app.use(cors({
-  origin: "https://boisterous-quokka-ce7558.netlify.app"
+  origin: "https://screenrecorderjes.netlify.app", // your Netlify link
 }));
 
 app.use(morgan("dev"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Root route (fixes Cannot GET /)
+app.get("/", (req, res) => {
+  res.send("Backend is running 🚀");
+});
 
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -48,7 +53,9 @@ db.run(`
 app.post("/api/recordings", upload.single("video"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  const { filename, path: filepath, size } = req.file;
+  const { filename, size } = req.file;
+  const filepath = `uploads/${filename}`; // ✅ relative path for frontend
+
   db.run(
     "INSERT INTO recordings (filename, filepath, filesize) VALUES (?, ?, ?)",
     [filename, filepath, size],
@@ -56,7 +63,7 @@ app.post("/api/recordings", upload.single("video"), (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({
         message: "Recording uploaded",
-        recording: { id: this.lastID, filename, filepath, size },
+        recording: { id: this.lastID, filename, filepath, filesize: size },
       });
     }
   );
@@ -70,7 +77,7 @@ app.get("/api/recordings", (req, res) => {
   });
 });
 
-// Get single recording (file download/stream)
+// Get single recording
 app.get("/api/recordings/:id", (req, res) => {
   const id = req.params.id;
   db.get("SELECT * FROM recordings WHERE id = ?", [id], (err, row) => {
@@ -88,7 +95,7 @@ app.delete("/api/recordings/:id", (req, res) => {
     if (!row) return res.status(404).json({ error: "Recording not found" });
 
     // Delete file from disk
-    fs.unlink(row.filepath, (unlinkErr) => {
+    fs.unlink(path.resolve(row.filepath), (unlinkErr) => {
       if (unlinkErr) console.error("Error deleting file:", unlinkErr);
     });
 
