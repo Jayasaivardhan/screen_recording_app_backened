@@ -9,7 +9,11 @@ const fs = require("fs");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// ✅ Allow only your Netlify frontend
+app.use(cors({
+  origin: "https://boisterous-quokka-ce7558.netlify.app"
+}));
+
 app.use(morgan("dev"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -76,7 +80,7 @@ app.get("/api/recordings/:id", (req, res) => {
   });
 });
 
-// ✅ Delete recording
+// Delete recording
 app.delete("/api/recordings/:id", (req, res) => {
   const id = req.params.id;
   db.get("SELECT * FROM recordings WHERE id = ?", [id], (err, row) => {
